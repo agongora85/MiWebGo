@@ -80,7 +80,7 @@ type Usuario struct {
 }
 
 // Definimos la siguiente variable para obtener los datos mediante Get una vez que la sesión se encuentre creada
-var sessionStore = map[string]Usuario{}
+// var sessionStore = map[string]Usuario{}
 
 type Pagina struct {
 	Caracteristicas []Caracteristicas
@@ -98,24 +98,55 @@ func inicio(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session_id")
 		if err != nil {
 			log.Println("No existe la cookie de sesión")
-			http.Redirect(w, r, constants.InicioSesion, http.StatusFound)
+			http.Redirect(
+				w,
+				r,
+				constants.InicioSesion,
+				http.StatusFound)
 			return
 		}
+
+		usuario, err := obtenerSesionBFF(cookie.Value)
+		if err != nil {
+			http.Redirect(
+				w,
+				r,
+				constants.InicioSesion,
+				http.StatusFound,
+			)
+			return
+		}
+
+		usuarios = append(usuarios, *usuario)
 		log.Println("Cookie encontrada: ", cookie.Value)
-		usuario, existe := sessionStore[cookie.Value]
+
+		/*if !validarSesionBFF(cookie.Value) {
+			log.Println("La sesión ya no existe en el BFF")
+			http.Redirect(
+				w,
+				r,
+				constants.InicioSesion,
+				http.StatusFound,
+			)
+			return
+		}*/
+
+		log.Println("Sesión válida en el BFF")
+
+		/*usuario, existe := sessionStore[cookie.Value]
 		if !existe {
 			log.Println("No existe sesión para: ", cookie.Value)
 			http.Redirect(w, r, constants.InicioSesion, http.StatusFound)
 			return
 		}
 		log.Println("Usuario recuperado desde sesión: ", usuario.Usuario)
-		usuarios = append(usuarios, usuario)
+		usuarios = append(usuarios, usuario)*/
 	}
 
 	// Validando la existencia de la cookie
 	if r.Method == http.MethodPost {
 
-		if cookie, err := r.Cookie("session_id"); err == nil {
+		/*if cookie, err := r.Cookie("session_id"); err == nil {
 			if _, existe := sessionStore[cookie.Value]; existe {
 				log.Println("Sesión ya existe")
 				http.Redirect(
@@ -126,7 +157,7 @@ func inicio(w http.ResponseWriter, r *http.Request) {
 				)
 				return
 			}
-		}
+		}*/
 
 		log.Println("=== VALIDANDO SESIÓN POST ===")
 
@@ -270,7 +301,7 @@ func inicio(w http.ResponseWriter, r *http.Request) {
 			log.Println("El valor del token es: ", token)
 
 			for _, cookie := range cookies {
-				sessionStore[cookie.Value] = usuarios[0]
+				// sessionStore[cookie.Value] = usuarios[0]
 				log.Printf("Enviando cookie al navegador: %s=%s",
 					cookie.Name,
 					cookie.Value)
@@ -314,6 +345,52 @@ func inicio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func obtenerSesionBFF(sessionID string) (*Usuario, error) {
+	log.Println("Entrando a obtenerSesionBFF")
+	req, err := http.NewRequest(
+		"GET",
+		constants.AuthPermissions,
+		nil,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	req.AddCookie(&http.Cookie{
+		Name:  "session_id",
+		Value: sessionID,
+	})
+
+	client := &http.Client{}
+
+	log.Println("Llamando: ", constants.AuthSession)
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	log.Println("Status auth/session: ", resp.Status)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("sesión inválida")
+	}
+
+	var usuario Usuario
+
+	err = json.NewDecoder(resp.Body).Decode(&usuario)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &usuario, nil
 }
 
 func validarUsuario(u Usuario) error {
@@ -426,6 +503,32 @@ func obtenerPermisosAplicacion(token, usuario, username, usuariont, idUsuario, t
 	log.Println("URL final es: ", resp.Request.URL)
 	return string(body), resp.Cookies(), nil
 }
+
+/*func validarSesionBFF(sessionID string) bool {
+	req, err := http.NewRequest(
+		"GET",
+		constants.AuthCheck,
+		nil,
+	)
+	if err != nil {
+		return false
+	}
+
+	req.AddCookie(&http.Cookie{
+		Name:  "session_id",
+		Value: sessionID,
+	})
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil {
+		log.Println("Error llamado auth/check:", err)
+		return false
+	}
+	defer resp.Body.Close()
+	log.Println("Status auth/check:", resp.Status)
+	return resp.StatusCode == http.StatusOK
+}*/
 
 // Se define la lista de estructura
 func decodeUsuarios(data []byte, depth int) ([]Usuario, error) {
