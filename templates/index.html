@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mi Primera Página en Go</title>
+</head>
+<body>
+    {{range .Usuarios}}
+    <h1>Bienvenido {{.Nombre}} {{.ApPaterno}} {{.ApMaterno}}</h1>
+    <h2>Usuario: {{.Usuario}}</h2>
+    <h2>IDRol: {{ .IDRol }} </h2>
+    <h3>Ruta retorno: {{ .RutaRetorno }}</h3>
+    <p>ID: {{.IDUsuario}}</p>
+    <p>Nombre: {{.Nombre}} {{.ApPaterno}} {{.ApMaterno}}</p>
+    <p>Tipo de usuario: {{.TipoUsuario}}</p>
+    <p>Dependencia: {{.IDDependencia}} ({{.ClvDependencia}})</p>
+    <p>Edificio: {{.IDEdificio}} ({{.ClvEdificio}})</p>
+    <p>Sistema: {{.IDSistema}} / {{.ClvSistema}}</p>
+    <p>Descripción: {{.Descripcion}}</p>
+    <h3>Opciones</h3>
+    <ul>
+        {{range .Opciones}}
+        <li>{{ .ClaveOpcion }} - {{.NombreObjeto}} — {{.Descripcion}} (permiso: {{.Permiso}})</li>
+        {{else}}
+        <li>Sin opciones</li>
+        {{end}}
+    </ul>
+    {{end}}
+    <label>Numero o código de oficio:</label>
+    <input type="text" name="numoficio" id="numoficio"><br><br>
+    <label>Descripción:</label>
+    <textarea name="descripcion" id="descripcion" rows="5" cols="30">Breve descripción del asunto del oficio</textarea><br><br>
+    <button>Guardar</button>
+    <h3>Prueba del resultado del BFF</h3>
+    {{ range .Caracteristicas}}
+        <p>{{ .Id }} : {{ .Caracteristica }}</p>
+    {{ end }}
+</body>
+</html>
