@@ -465,7 +465,6 @@ func obtenerPermisosAplicacion(token, usuario, username, usuariont, idUsuario, t
 	// La siguiente línea es para mostrar el json que se obtiene del WebLog
 	// log.Println(string(jsonData))
 	resp, err := client.PostForm(
-		//"https://localhost:7096/auth/callback",
 		constants.AuthCallback,
 		form,
 	)
@@ -658,8 +657,6 @@ func obtenerPermisos() ([]Caracteristicas, error) {
 	// En este punto se llama al BFF
 	log.Println("Iniciando llamada al BFF...")
 	resp, err := http.Get(
-		//"http://localhost:5165/api/PermisosUsuario",
-		//"https://localhost:7096/api/PermisosUsuario",
 		constants.PermisosUsuario,
 	)
 
@@ -686,9 +683,6 @@ func obtenerPermisos() ([]Caracteristicas, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	/*log.Println("Resultado BFF:")
-	log.Println(string(body))*/
 
 	return respuesta.CaracteristicasJuecesPaz, nil
 }
