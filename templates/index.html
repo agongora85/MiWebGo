@@ -2,6 +2,26 @@
 <html>
 <head>
     <title>Mi Primera Página en Go</title>
+<style>
+    .modal{
+        position:fixed;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(0,0,0,.5);
+        z-index:9999;
+    }
+
+    .modal-content{
+        background:white;
+        width:400px;
+        padding:20px;
+        margin:10% auto;
+        border-radius:10px;
+        text-align:center;
+    }
+</style>
 </head>
 <body>
     {{range .Usuarios}}
@@ -34,5 +54,109 @@
     {{ range .Caracteristicas}}
         <p>{{ .Id }} : {{ .Caracteristica }}</p>
     {{ end }}
+    <!-- Ventana modal para renovar la sesión -->
+    <div id="modalSesion" class="modal" style="display:none">
+        <div class="modal-content">
+            <h3>Su sesión está por expirar</h3>
+            <p>¿Deseas renovar la sesión?</p>
+            <button onclick="renovarSesion()">
+                Renovar
+            </button>
+            <button onclick="cerrarSesion()">
+                Salir
+            </button>
+        </div>
+    </div>
+<script>
+    let modalMostrado = false;
+
+    setInterval(() => {
+
+        let expiration = getCookie("session_expiration");
+
+        console.log("session_expiration:", expiration);
+
+        if (!expiration) return;
+
+        let restante =
+            parseInt(expiration) * 1000 - Date.now();
+
+        console.log("Milisegundos restantes:", restante);
+        console.log("Segundos restantes:", Math.floor(restante / 1000));
+
+        //if (restante <= 120000 && !modalMostrado) {
+        if (restante <= 870000 && !modalMostrado) {
+
+            console.log("Mostrando modal");
+
+            modalMostrado = true;
+
+            document.getElementById(
+                "modalSesion"
+            ).style.display = "block";
+        }
+
+    }, 1000); //30000);
+
+    /*setInterval(() =>  {
+        let expiration = getCookie("session_expiration");
+    
+        if(!expiration) return;
+    
+        let restante = parseInt(expiration) * 1000 - Date.now();
+    
+        if (restante <= 120000 && !modalMostrado){
+            modalMostrado = true;
+            document.getElementById("modalSesion").style.display="block";
+        }
+        // 30000 cada 30 segundos revisa si la cookie está a menos de 2 minutos de vencer
+    }, 30000);*/
+
+
+    /*setTimeout(() => {
+
+        document.getElementById(
+            "modalSesion"
+        ).style.display = "block";
+
+    }, 30000);*/
+
+    function getCookie(name){
+        const value = document.cookie
+            .split("; ")
+            .find(row => row.startsWith(name + "="));
+        return value
+            ? value.split("=")[1]
+            : null;
+    }
+
+    async function renovarSesion(){
+        let response = await fetch(
+            "/renovar-sesion",
+            {
+                method: "POST",
+                credentials: "include"
+            }
+        );
+        if(response.ok){
+            alert("Sesión renovada");
+
+            modalMostrado = false;
+
+            document.getElementById("modalSesion").style.display="none";
+        }
+    }
+
+    async function cerrarSesion(){
+        /*document.cookie = "session_expiration=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        window.location.href="/iniciosesion";*/
+        await fetch("/logout", {
+            method: "POST",
+            credentials: "include"
+        });
+        window.location.replace("/iniciosesion");
+    }
+</script>
+
 </body>
 </html>

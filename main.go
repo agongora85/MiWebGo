@@ -18,7 +18,9 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // Representación del endPoint de prueba
@@ -96,6 +98,7 @@ func inicio(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		log.Println("=== VALIDANDO SESIÓN GET ===")
 		cookie, err := r.Cookie("session_id")
+		// Sino existe la cookie se redirecciona a iniciosesion
 		if err != nil {
 			log.Println("No existe la cookie de sesión")
 			http.Redirect(
@@ -120,44 +123,11 @@ func inicio(w http.ResponseWriter, r *http.Request) {
 		usuarios = append(usuarios, *usuario)
 		log.Println("Cookie encontrada: ", cookie.Value)
 
-		/*if !validarSesionBFF(cookie.Value) {
-			log.Println("La sesión ya no existe en el BFF")
-			http.Redirect(
-				w,
-				r,
-				constants.InicioSesion,
-				http.StatusFound,
-			)
-			return
-		}*/
-
 		log.Println("Sesión válida en el BFF")
-
-		/*usuario, existe := sessionStore[cookie.Value]
-		if !existe {
-			log.Println("No existe sesión para: ", cookie.Value)
-			http.Redirect(w, r, constants.InicioSesion, http.StatusFound)
-			return
-		}
-		log.Println("Usuario recuperado desde sesión: ", usuario.Usuario)
-		usuarios = append(usuarios, usuario)*/
 	}
 
 	// Validando la existencia de la cookie
 	if r.Method == http.MethodPost {
-
-		/*if cookie, err := r.Cookie("session_id"); err == nil {
-			if _, existe := sessionStore[cookie.Value]; existe {
-				log.Println("Sesión ya existe")
-				http.Redirect(
-					w,
-					r,
-					"/",
-					http.StatusFound,
-				)
-				return
-			}
-		}*/
 
 		log.Println("=== VALIDANDO SESIÓN POST ===")
 
@@ -309,6 +279,15 @@ func inicio(w http.ResponseWriter, r *http.Request) {
 				cookie.Path = "/"
 				http.SetCookie(w, cookie)
 			}
+
+			expira := time.Now().Add(15 * time.Minute)
+
+			http.SetCookie(w, &http.Cookie{
+				Name:  "session_expiration",
+				Value: strconv.FormatInt(expira.Unix(), 10),
+				Path:  "/",
+			})
+
 			http.Redirect(
 				w,
 				r,
@@ -503,31 +482,20 @@ func obtenerPermisosAplicacion(token, usuario, username, usuariont, idUsuario, t
 	return string(body), resp.Cookies(), nil
 }
 
-/*func validarSesionBFF(sessionID string) bool {
-	req, err := http.NewRequest(
-		"GET",
-		constants.AuthCheck,
-		nil,
-	)
+func ValidarSesion(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session_id")
 	if err != nil {
-		return false
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
-
-	req.AddCookie(&http.Cookie{
-		Name:  "session_id",
-		Value: sessionID,
-	})
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	_, err = obtenerSesionBFF(cookie.Value)
 
 	if err != nil {
-		log.Println("Error llamado auth/check:", err)
-		return false
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
-	defer resp.Body.Close()
-	log.Println("Status auth/check:", resp.Status)
-	return resp.StatusCode == http.StatusOK
-}*/
+	w.WriteHeader(http.StatusOK)
+}
 
 // Se define la lista de estructura
 func decodeUsuarios(data []byte, depth int) ([]Usuario, error) {
@@ -688,6 +656,13 @@ func obtenerPermisos() ([]Caracteristicas, error) {
 }
 
 func VerCookies(w http.ResponseWriter, r *http.Request) {
+	/*
+		w (http.ResponseWrites), objeto para enviar la respuesta al navegador
+		r (*http.Request), objeto que contiene toda la información de la petición HTTP recibida del navegador, como cookies, encabezados, método, parámetros, etc.
+	*/
+
+	cookies := r.Cookies()
+	log.Println("La cantidad de cookies es: ", len(cookies))
 
 	for _, c := range r.Cookies() {
 		fmt.Fprintf(
@@ -696,6 +671,7 @@ func VerCookies(w http.ResponseWriter, r *http.Request) {
 			c.Name,
 			c.Value,
 		)
+		log.Println("Los valores de las cookies son los siguientes: ", c.Name, "=", c.Value)
 	}
 }
 
@@ -714,11 +690,67 @@ func InicioHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "index.html")
 }
 
+func RenovarSesion(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session_id")
+	if err != nil {
+		http.Error(
+			w,
+			"Sesión inválida",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	nuevaCookie := &http.Cookie{
+		Name:     "session_id",
+		Value:    cookie.Value,
+		Path:     "/",
+		MaxAge:   900,
+		HttpOnly: true,
+	}
+
+	http.SetCookie(
+		w,
+		nuevaCookie,
+	)
+
+	expira := time.Now().Add(15 * time.Minute)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:  "session_expiration",
+		Value: strconv.FormatInt(expira.Unix(), 10),
+		Path:  "/",
+	})
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:   "session_id",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:   "session_expiration",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // Función que se ejecuta al momento de cargar
 func main() {
 	log.Println("Servidor iniciado")
 	http.HandleFunc("/cookies", VerCookies)
 	http.HandleFunc("/iniciosesion", InicioSesion)
+	http.HandleFunc("/validar-sesion", ValidarSesion)
+	http.HandleFunc("/renovar-sesion", RenovarSesion)
+	http.HandleFunc("/logout", Logout)
 	http.HandleFunc("/", inicio)
 	if err := http.ListenAndServe(":3000", nil); err != nil {
 		log.Fatal(err)
