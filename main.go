@@ -328,16 +328,19 @@ func inicio(w http.ResponseWriter, r *http.Request) {
 
 func obtenerSesionBFF(sessionID string) (*Usuario, error) {
 	log.Println("Entrando a obtenerSesionBFF")
+	// Preparo la petición
 	req, err := http.NewRequest(
 		"GET",
 		constants.AuthPermissions,
 		nil,
 	)
 
+	// Verifico errores
 	if err != nil {
 		return nil, err
 	}
 
+	// Agrego la cookie de sesión
 	req.AddCookie(&http.Cookie{
 		Name:  "session_id",
 		Value: sessionID,
@@ -345,7 +348,7 @@ func obtenerSesionBFF(sessionID string) (*Usuario, error) {
 
 	client := &http.Client{}
 
-	log.Println("Llamando: ", constants.AuthSession)
+	log.Println("Llamando: ", constants.AuthPermissions)
 
 	resp, err := client.Do(req)
 
@@ -706,6 +709,7 @@ func RenovarSesion(w http.ResponseWriter, r *http.Request) {
 		Value:    cookie.Value,
 		Path:     "/",
 		MaxAge:   900,
+		Expires:  time.Now().Add(15 * time.Minute),
 		HttpOnly: true,
 	}
 

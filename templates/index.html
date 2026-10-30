@@ -65,61 +65,66 @@
             <button onclick="cerrarSesion()">
                 Salir
             </button>
+            <div class="modal-footer">
+            <p>
+                La sesión se cerrará automáticamente en
+                <span id="cuentaRegresiva">30</span>
+                segundos.
+            </p>
+            </div>
         </div>
     </div>
 <script>
     let modalMostrado = false;
+    let timeoutModal = null;
+    let contador = null;
+    let ultimaActividad = Date.now();
+    let ultimaRenovacion = 0;
 
     setInterval(() => {
 
         let expiration = getCookie("session_expiration");
-
-        console.log("session_expiration:", expiration);
-
-        if (!expiration) return;
-
+        if (!expiration){
+            cerrarSesion();
+            return;
+        } 
         let restante =
-            parseInt(expiration) * 1000 - Date.now();
+            parseInt(expiration,10) * 1000 - Date.now();
+        console.log("session_expiration:", expiration);
+        console.log("Segundos restantes: ", Math.floor(restante/1000));
 
-        console.log("Milisegundos restantes:", restante);
-        console.log("Segundos restantes:", Math.floor(restante / 1000));
+        if(restante <= 0){
+            cerrarSesion();
+            return;
+        }    
 
-        //if (restante <= 120000 && !modalMostrado) {
-        if (restante <= 870000 && !modalMostrado) {
-
-            console.log("Mostrando modal");
-
-            modalMostrado = true;
-
-            document.getElementById(
-                "modalSesion"
-            ).style.display = "block";
+        //  Mostrar modal cuando falten 2 minutos
+        if(restante <= 120000 && !modalMostrado){
+            modalMostrado= true;
+            document.getElementById("modalSesion").style.display = "block";
+            if(contador){
+                clearInterval(contador);
+            }
+            if(timeoutModal){
+                clearTimeout(timeoutModal);
+            }
+            let segundos = 30;
+            document.getElementById("cuentaRegresiva").innerHTML = segundos;
+            contador=setInterval(()=>{
+                segundos--;
+                document.getElementById("cuentaRegresiva").innerText = segundos;
+                if(segundos <= 0){
+                    document.getElementById("cuentaRegresiva").innerText=0;
+                    clearInterval(contador);
+                    cerrarSesion();
+                    // return;
+                }
+            },1000);
+            timeoutModal = setTimeout(()=> {
+                cerrarSesion();
+            },30000);
         }
-
     }, 1000); //30000);
-
-    /*setInterval(() =>  {
-        let expiration = getCookie("session_expiration");
-    
-        if(!expiration) return;
-    
-        let restante = parseInt(expiration) * 1000 - Date.now();
-    
-        if (restante <= 120000 && !modalMostrado){
-            modalMostrado = true;
-            document.getElementById("modalSesion").style.display="block";
-        }
-        // 30000 cada 30 segundos revisa si la cookie está a menos de 2 minutos de vencer
-    }, 30000);*/
-
-
-    /*setTimeout(() => {
-
-        document.getElementById(
-            "modalSesion"
-        ).style.display = "block";
-
-    }, 30000);*/
 
     function getCookie(name){
         const value = document.cookie
@@ -131,25 +136,63 @@
     }
 
     async function renovarSesion(){
-        let response = await fetch(
-            "/renovar-sesion",
-            {
-                method: "POST",
-                credentials: "include"
+        if(timeoutModal){
+            clearTimeout(timeoutModal);
+            timeoutModal = null;
+        }
+
+        if(contador){
+            clearInterval(contador);
+            contador = null;
+        }
+
+        try{
+            console.log("Renovar presionado");
+            const response = await fetch(
+                "/renovar-sesion",
+                {
+                    method: "POST",
+                    credentials: "include"
+                }
+            );
+
+            console.log("Status renovar-sesion:", response.status);
+
+            if(response.status === 401) {
+                alert("La sesión ya expiró");
+                window.location.replace("/iniciosesion");
+                return;
             }
-        );
-        if(response.ok){
-            alert("Sesión renovada");
 
-            modalMostrado = false;
+            if(!response.ok){
+                alert("No fue posible renovar la sesión");
+                window.location.replace("/iniciosesion");
+                return;
+            }
 
-            document.getElementById("modalSesion").style.display="none";
+            if(response.ok){
+                ultimaActividad = Date.now();
+                ultimaRenovacion = Date.now();
+                modalMostrado = false;
+                document.getElementById("modalSesion").style.display="none";
+            }
+        }catch(error){
+            console.log("Error al renovar sesión:",error);
+            alert("No fue posible comunicarse con el servidor");
+            // window.location.replace("/iniciosesion");
         }
     }
 
     async function cerrarSesion(){
-        /*document.cookie = "session_expiration=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        window.location.href="/iniciosesion";*/
+        if(timeoutModal){
+            clearTimeout(timeoutModal);
+            timeoutModal = null;
+        }
+
+        if(contador){
+            clearInterval(contador);
+            contador = null;
+        }
         await fetch("/logout", {
             method: "POST",
             credentials: "include"
